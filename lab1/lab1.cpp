@@ -126,11 +126,13 @@ double exp_distr(double lambda)
   return -log(1 - random_norm()) / lambda;
 }
 
-void test_inverse_function_generator(const size_t opt_count)
+void test_exp_generator(double lambda, const size_t opt_count)
 {
+  double cum_sum = .0;
   std::vector<double> generated_values(opt_count);
   for (size_t i = 0; i < opt_count; ++i) {
-    generated_values[i] = random_distr(Icdf_sin());
+    generated_values[i] = exp_distr(lambda);
+    cum_sum += generated_values[i];
   }
 
   Gnuplot gp;
@@ -141,7 +143,6 @@ void test_inverse_function_generator(const size_t opt_count)
   gp << "rounded(x) = bin_width * (bin_number(x));\n";
   gp << "plot" << gp.file1d(generated_values) << "using(rounded($1)):(1) smooth frequency with boxes title 'Count of experiments: "
      << opt_count << "';\n";
-  
 }
 
 Task::Task()
@@ -210,7 +211,7 @@ int main(int argc, char *argv[])
   std::cout << "----- Sample generator test -----\n";
   test_sample_generator(p, 1, opt_count);
   std::cout << "----- Distribution test -----\n";
-  test_inverse_function_generator(opt_count);
+  test_exp_generator(1.5, opt_count);
   std::cout << "Press any key to exit...\n";
   std::cin.get();
   return 0;
