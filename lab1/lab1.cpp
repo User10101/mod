@@ -1,5 +1,10 @@
 #include "model.h"
 
+inline bool double_eq(double d1, double d2, double epsilon = 0.00001)
+{
+  return fabs(d1 - d2) < epsilon ? true : false;
+}
+
 inline double random_norm()
 {
   return (double)rand() / (double)RAND_MAX;
@@ -18,8 +23,9 @@ std::vector<double> distr_to_cum(const std::vector<double> &distribution)
 
 size_t random_index(const std::vector<double> &cum_probabilities)
 {
-  if (cum_probabilities[cum_probabilities.size() - 1] != 1.) {
-    throw std::invalid_argument("Sum of prob is not equals to one.");
+  if (!double_eq(cum_probabilities[cum_probabilities.size() - 1], 1.)) {
+    throw std::invalid_argument("Sum of prob is " + std::to_string(cum_probabilities[cum_probabilities.size() - 1])
+				+ " and not equals to one.");
   }
   
   if (cum_probabilities.size() == 1 && cum_probabilities[0] == 1.) {
@@ -128,26 +134,14 @@ double exp_distr(double lambda)
 
 void test_exp_generator(double lambda, const size_t opt_count)
 {
-  double cum_sum = .0;
-  std::vector<double> generated_values(opt_count);
+  std::ofstream ost;
+  ost.open("hist.dat", std::ios_base::trunc);
   for (size_t i = 0; i < opt_count; ++i) {
-    generated_values[i] = exp_distr(lambda);
-    cum_sum += generated_values[i];
+    ost << exp_distr(lambda) << '\n';
   }
+  ost.close();
 
-  Gnuplot gp;
-  gp << "set boxwidth 0.28 absolute;\n";
-  gp << "set style fill solid 1.0 border 0.5;\n";
-  gp << "bin_width = 0.3;\n";
-  gp << "bin_number(x) = floor(x / bin_width);\n";
-  gp << "rounded(x) = bin_width * (bin_number(x));\n";
-  gp << "plot" << gp.file1d(generated_values) << "using(rounded($1)):(1) smooth frequency with boxes title 'Count of experiments: "
-     << opt_count << "';\n";
-}
-
-Task::Task()
-{
-
+  system("Rscript plot_hist.R");
 }
 
 CS::CS(unsigned int memory, unsigned int cores)
@@ -197,6 +191,89 @@ Op_result CS::cores_free(unsigned int num)
   return ERROR;
 }
 
+Op_result schedule(Event *e)
+{
+  if (e->time < system_time) {
+    return ERROR;
+  }
+
+  for (auto iter = begin(calendar); iter != end(calendar); ++iter) {
+    if ((*iter)->time < e->time) {
+      calendar.insert(iter, e);
+      return SUCCESS;
+    }
+  }
+
+  calendar.push_back(e);
+  return SUCCESS;
+}
+
+Op_result cancel(Event *e, Time t)
+{
+
+}
+
+void simulate()
+{
+
+}
+
+Task::Task(Time stime, Time etime, unsigned short ncores, unsigned short mem)
+  : Event(stime), execution_time(etime), n_cores(ncores), memory(mem)
+{
+  // DO NOTHING
+}
+
+Task::~Task()
+{
+  // DO NOTHING
+}
+
+void Task::execute()
+{
+  // TODO 
+}
+
+Cancel_task::Cancel_task(Time stime, unsigned short ncores, unsigned short mem)
+  : Event(stime), n_cores(ncores), memory(mem)
+{
+  // DO NOTHING
+}
+
+Cancel_task::~Cancel_task()
+{
+  // DO NOTHING
+}
+
+void Cancel_task::execute()
+{
+  // TODO
+}
+
+void generate_task_list(double lambda_scheduling, double lambda_execution, size_t n)
+{
+  std::vector<double> memory_distribution = {0.0, 0.02, 0.01, 0.01, 0.06, 0.1, 0.15,
+					     0.15, 0.12, 0.08, 0.07, 0.07, 0.06, 0.06, 0.04};
+  std::vector<double> cores_distribution = {0.0, 0.35, 0.15, 0.1, 0.1, 0.1, 0.05, 0.01, 0.01, 0.01, 0.01, 0.01,
+					    0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.005, 0.005};
+
+  std::vector<double> cum_memory_distribution = distr_to_cum(memory_distribution);
+  std::vector<double> cum_cores_distribution = distr_to_cum(cores_distribution);
+
+  Event *event;
+  Time schedule_time = .0, duration;
+  unsigned int n_cores;
+  unsigned int memory;
+  for (size_t i = 0; i < n; ++i) {
+    schedule_time += exp_distr(lambda_scheduling);
+    duration = exp_distr(lambda_execution);
+    n_cores = random_index(cum_cores_distribution);
+    memory = random_index(cum_memory_distribution);
+    event = new Task(schedule_time, duration, n_cores, memory);
+    schedule(event);
+  }
+}
+
 int main(int argc, char *argv[])
 {
   size_t opt_count = 10000;
@@ -205,14 +282,10 @@ int main(int argc, char *argv[])
   }
   
   srand(time(NULL));
-  std::vector<double> p = {0.05, 0.05, 0.15, 0.05, 0.2, 0.25, 0.25};
-  std::cout << "----- Number generator test -----\n";
-  test_number_generator(p, opt_count);
-  std::cout << "----- Sample generator test -----\n";
-  test_sample_generator(p, 1, opt_count);
-  std::cout << "----- Distribution test -----\n";
-  test_exp_generator(1.5, opt_count);
-  std::cout << "Press any key to exit...\n";
-  std::cin.get();
+  generate_task_list(0.35, 0.5, 10);
+  std::cout << "Scheduled time | execution_time | n_cores | memory\n";
+  for (auto iter = begin(calendar); iter != end(calendar); ++iter) {
+    std::cout << ((Task *)(*iter))->time << ' ' << ((Task *)(*iter))->execution_time << ' ' << ((Task *)(*iter))->n_cores << ' ' << ((Task *)(*iter))->memory << std::endl;
+  }
   return 0;
 }
