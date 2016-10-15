@@ -67,7 +67,7 @@ std::vector<size_t> sample_nr(const std::vector<double> &prob, const size_t samp
   return sample;
 }
 
-// Inverse cumulative distribution function - sin. 
+// Inverse cumulative distribution function - sin.
 class Icdf_sin
 {
 public:
@@ -215,7 +215,10 @@ Op_result cancel(Event *e, Time t)
 
 void simulate()
 {
-
+  for (auto event : calendar) {
+    event->execute();
+    calendar.remove(*event);
+  }
 }
 
 Task::Task(Time stime, Time etime, unsigned short ncores, unsigned short mem)
