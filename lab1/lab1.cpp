@@ -27,11 +27,11 @@ size_t random_index(const std::vector<double> &cum_probabilities)
     throw std::invalid_argument("Sum of prob is " + std::to_string(cum_probabilities[cum_probabilities.size() - 1])
 				+ " and not equals to one.");
   }
-  
+
   if (cum_probabilities.size() == 1 && cum_probabilities[0] == 1.) {
     return 0;
   }
-  
+
   double csi = random_norm();
   for (size_t i = 0; i < cum_probabilities.size(); ++i) {
     if (csi < cum_probabilities[i]) {
@@ -50,7 +50,7 @@ std::vector<size_t> sample_nr(const std::vector<double> &prob, const size_t samp
   for (size_t i = 0; i < indexes.size(); ++i) {
     indexes[i] = i;
   }
-  
+
   for (size_t i = 0; i < sample_size; ++i) {
     csi = random_norm() * norm_mult;
     cum_prob = .0;
@@ -85,14 +85,17 @@ double random_distr(const T &distr)
   return distr(random_norm());
 }
 
-void report_results(const std::vector<size_t> &hist_data, const std::vector<double> &p, const size_t opt_count)
+void report_results(const std::vector<size_t> &hist_data,
+		    const std::vector<double> &p, const size_t opt_count)
 {
   std::cout.precision(5);
   std::cout.width(5);
   for (size_t i = 0; i < p.size(); ++i) {
     double exp_p = (double)hist_data[i]/opt_count;
-    std::cout << "Expected probability: " << p[i] << "\tExperimental probability: "
-	      << exp_p << "\tError: " << std::fabs((p[i] - exp_p)) * 100 / p[i] << "%\n";
+    std::cout << "Expected probability: " << p[i]
+	      << "\tExperimental probability: "
+	      << exp_p << "\tError: "
+	      << std::fabs((p[i] - exp_p)) * 100 / p[i] << "%\n";
   }
 }
 
@@ -107,7 +110,8 @@ void test_number_generator(const std::vector<double> &p, const size_t opt_count)
   report_results(hist_data, p, opt_count);
 }
 
-void test_sample_generator(const std::vector<double> &p, const size_t sample_size, const size_t opt_count)
+void test_sample_generator(const std::vector<double> &p,
+			   const size_t sample_size, const size_t opt_count)
 {
   std::vector<size_t> sample;
   std::vector<size_t> hist_data(p.size());
@@ -144,116 +148,9 @@ void test_exp_generator(double lambda, const size_t opt_count)
   system("Rscript plot_hist.R");
 }
 
-CS::CS(unsigned int memory, unsigned int cores)
-  : memory_size(memory), core_num(cores)
-{
-  free_memory = memory_size;
-  free_cores = core_num;
-}
-
-Op_result CS::mem_alloc(unsigned int size)
-{
-  if (free_memory >= size) {
-    free_memory -= size;
-    return SUCCESS;
-  }
-
-  return ERROR;
-}
-
-Op_result CS::mem_free(unsigned int size)
-{
-  if (free_memory + size <= memory_size) {
-    free_memory += size;
-    return SUCCESS;
-  }
-
-  return ERROR;
-}
-
-Op_result CS::cores_alloc(unsigned int num)
-{
-  if (free_cores >= num) {
-    free_cores -= num;
-    return SUCCESS;
-  }
-
-  return ERROR;
-}
-
-Op_result CS::cores_free(unsigned int num)
-{
-  if (free_cores + num <= core_num) {
-    free_cores += num;
-    return SUCCESS;
-  }
-  
-  return ERROR;
-}
-
-Op_result schedule(Event *e)
-{
-  if (e->time < system_time) {
-    return ERROR;
-  }
-
-  for (auto iter = begin(calendar); iter != end(calendar); ++iter) {
-    if ((*iter)->time < e->time) {
-      calendar.insert(iter, e);
-      return SUCCESS;
-    }
-  }
-
-  calendar.push_back(e);
-  return SUCCESS;
-}
-
-Op_result cancel(Event *e, Time t)
-{
-
-}
-
-void simulate()
-{
-  for (auto event : calendar) {
-    event->execute();
-    calendar.remove(*event);
-  }
-}
-
-Task::Task(Time stime, Time etime, unsigned short ncores, unsigned short mem)
-  : Event(stime), execution_time(etime), n_cores(ncores), memory(mem)
-{
-  // DO NOTHING
-}
-
-Task::~Task()
-{
-  // DO NOTHING
-}
-
-void Task::execute()
-{
-  // TODO 
-}
-
-Cancel_task::Cancel_task(Time stime, unsigned short ncores, unsigned short mem)
-  : Event(stime), n_cores(ncores), memory(mem)
-{
-  // DO NOTHING
-}
-
-Cancel_task::~Cancel_task()
-{
-  // DO NOTHING
-}
-
-void Cancel_task::execute()
-{
-  // TODO
-}
-
-void generate_task_list(double lambda_scheduling, double lambda_execution, size_t n)
+void generate_task_list(double lambda_scheduling, double lambda_execution, size_t n,
+			std::list<Event *> &calendar, Queue &queue,
+			CS &cs, Time &system_time)
 {
   std::vector<double> memory_distribution = {0.0, 0.02, 0.01, 0.01, 0.06, 0.1, 0.15,
 					     0.15, 0.12, 0.08, 0.07, 0.07, 0.06, 0.06, 0.04};
@@ -273,7 +170,7 @@ void generate_task_list(double lambda_scheduling, double lambda_execution, size_
     n_cores = random_index(cum_cores_distribution);
     memory = random_index(cum_memory_distribution);
     event = new Task(schedule_time, duration, n_cores, memory);
-    schedule(event);
+    schedule(event, &calendar, &queue, &cs, &system_time);
   }
 }
 
@@ -283,12 +180,22 @@ int main(int argc, char *argv[])
   if (argc == 2) {
     opt_count = atoi(argv[1]);
   }
-  
+
+  CS cs(MEMORY_SIZE, CORES_COUNT);
+  std::list<Event *> calendar;
+  Time system_time = 0;
+  Queue queue(QUEUE_SIZE);
+
   srand(time(NULL));
-  generate_task_list(0.35, 0.5, 10);
-  std::cout << "Scheduled time | execution_time | n_cores | memory\n";
+  generate_task_list(0.35, 0.5, 10, calendar, queue, cs, system_time);
+  std::cout << "Scheduled time | execution_time | n_cores | memory |\n";
   for (auto iter = begin(calendar); iter != end(calendar); ++iter) {
-    std::cout << ((Task *)(*iter))->time << ' ' << ((Task *)(*iter))->execution_time << ' ' << ((Task *)(*iter))->n_cores << ' ' << ((Task *)(*iter))->memory << std::endl;
+    std::cout << std::setw(strlen("Scheduled time ")) << ((Task *)(*iter))->time << std::setw(1) << '|'
+	      << std::setw(strlen(" execution_time ")) << ((Task *)(*iter))->execution_time << std::setw(1) << '|'
+	      << std::setw(strlen(" n_cores ")) << ((Task *)(*iter))->n_cores << std::setw(1) << '|'
+	      << std::setw(strlen(" memory ")) << ((Task *)(*iter))->memory << std::setw(1) << '|' << std::endl;
   }
+  simulate(&calendar, &queue, &cs, &system_time);
+
   return 0;
 }
