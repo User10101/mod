@@ -4,67 +4,74 @@
 
 #include "catch.hpp"
 
+#define MEMORY_SIZE (1024 * 1024 * 1024)
+#define CORES_COUNT 30
+
 CS cs(MEMORY_SIZE, CORES_COUNT);
 std::list<Event *> calendar;
 Time system_time = 0;
 
 TEST_CASE("Queue", "main") {
-  Queue q(5);
-  q.enque_task(10, 3, system_time);
+  Queue q;
+  Event *e = new Task(5, 1, 3, 1024);
+  q.enque_task(e);
   system_time = 0.5;
-  q.enque_task(8, 4, system_time);
+  Event *e1 = new Task(7, 2, 4, 2048);
+  q.enque_task(e1);
   system_time = 0.7;
-  q.enque_task(4, 11, system_time);
+  Event *e2 = new Task(7.5, 2, 2, 512);
+  q.enque_task(e2);
 
   Op_result r;
-  unsigned int m, c;
-  system_time = 1.1;
-  r = q.top_fifo(&m, &c);
-  REQUIRE(m == 10);
-  REQUIRE(c == 3);
-  REQUIRE(r == SUCCESS);
-  q.pop_fifo();
+  Event *tmp;
+  system_time = 5;
+  tmp = q.top_fifo();
+  REQUIRE(tmp->execution_time == 1);
+  REQUIRE(tmp->n_cores == 3);
+  REQUIRE(tmp->memory == 1024);
+  q.pop_fifo(system_time);
 
-  system_time = 1.2;
-  r = q.top_fifo(&m, &c);
-  REQUIRE(m == 8);
-  REQUIRE(c == 4);
-  REQUIRE(r == SUCCESS);
-  q.pop_fifo();
+  system_time = 10.5;
+  tmp = q.top_fifo();
+  REQUIRE(tmp->execution_time == 2);
+  REQUIRE(tmp->n_cores == 4);
+  REQUIRE(tmp->memory == 2048);
+  q.pop_fifo(system_time);
 
-  system_time = 1.4;
-  r = q.top_fifo(&m, &c);
-  REQUIRE(m == 4);
-  REQUIRE(c == 11);
-  REQUIRE(r == SUCCESS);
-  q.pop_fifo();
+  system_time = 11;
+  tmp = q.top_fifo();
+  REQUIRE(tmp->execution_time == 2);
+  REQUIRE(tmp->n_cores == 2);
+  REQUIRE(tmp->memory == 512);
+  q.pop_fifo(system_time);
 
-  r = q.top_fifo(&m, &c);
-  REQUIRE(m == -1);
-  REQUIRE(c == -1);
-  REQUIRE(r == ERROR);
-  q.pop_fifo();
+  tmp = q.top_fifo();
+  REQUIRE(tmp == nullptr);
+  q.pop_fifo(system_time);
 
   std::vector<Time> stat = q.get_stat();
-  std::vector<Time> exp_stat = { 1.1, 0.7, 0.7 };
+  std::vector<Time> exp_stat = { 0, 3.5, 3.5 };
+  for (size_t i = 0; i < stat.size(); ++i) {
+    REQUIRE(Approx(stat[i]) == exp_stat[i]);
+  }
 }
 
 TEST_CASE("CS Test", "Main") {
-  REQUIRE(cs.cores_free(1) == ERROR);
+  REQUIRE(cs.cores_free(1, 0) == ERROR);
 
-  REQUIRE(cs.mem_alloc(MEMORY_SIZE + 1) == ERROR);
-  REQUIRE(cs.mem_alloc(MEMORY_SIZE - 1) == SUCCESS);
-  REQUIRE(cs.mem_alloc(1) == SUCCESS);
-  REQUIRE(cs.mem_alloc(1) == ERROR);
-  REQUIRE(cs.mem_free(1) == SUCCESS);
-  REQUIRE(cs.mem_alloc(1) == SUCCESS);
-  REQUIRE(cs.mem_alloc(1) == ERROR);
+  REQUIRE(cs.mem_alloc(MEMORY_SIZE + 1, 0) == ERROR);
+  REQUIRE(cs.mem_alloc(MEMORY_SIZE - 1, 0) == SUCCESS);
+  REQUIRE(cs.mem_alloc(1, 0) == SUCCESS);
+  REQUIRE(cs.mem_alloc(1, 0) == ERROR);
+  REQUIRE(cs.mem_free(1, 0) == SUCCESS);
+  REQUIRE(cs.mem_alloc(1, 0) == SUCCESS);
+  REQUIRE(cs.mem_alloc(1, 0) == ERROR);
 
-  REQUIRE(cs.cores_alloc(CORES_COUNT + 1) == ERROR);
-  REQUIRE(cs.cores_alloc(CORES_COUNT - 1) == SUCCESS);
-  REQUIRE(cs.cores_alloc(1) == SUCCESS);
-  REQUIRE(cs.cores_alloc(1) == ERROR);
-  REQUIRE(cs.cores_free(1) == SUCCESS);
-  REQUIRE(cs.cores_alloc(1) == SUCCESS);
-  REQUIRE(cs.cores_alloc(1) == ERROR);
+  REQUIRE(cs.cores_alloc(CORES_COUNT + 1, 0) == ERROR);
+  REQUIRE(cs.cores_alloc(CORES_COUNT - 1, 0) == SUCCESS);
+  REQUIRE(cs.cores_alloc(1, 0) == SUCCESS);
+  REQUIRE(cs.cores_alloc(1, 0) == ERROR);
+  REQUIRE(cs.cores_free(1, 0) == SUCCESS);
+  REQUIRE(cs.cores_alloc(1, 0) == SUCCESS);
+  REQUIRE(cs.cores_alloc(1, 0) == ERROR);
 }
