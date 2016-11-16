@@ -23,20 +23,27 @@ class Queue
 {
 public:
   Queue();
-  ~Queue();
+  virtual ~Queue();
 
-  void enque_task(Event *e);
+  virtual void enque_task(Event *e);
   Event* top_fifo();
   void pop_fifo(Time system_time);
-  Op_result deque_sl();
-  Op_result dequeq_sf();
 
   size_t size();
 
   std::vector<Time> get_stat();
-private:
+protected:
   std::list<Event *> queue;
   std::vector<Time> stat;
+};
+
+class Sl_queue : public Queue
+{
+public:
+  Sl_queue();
+  virtual ~Sl_queue();
+
+  void enque_task(Event *e) override;
 };
 
 class CS
@@ -93,7 +100,7 @@ public:
   const unsigned int memory;
 
   const std::string name;
-private:
+protected:
   Time _time;
 };
 

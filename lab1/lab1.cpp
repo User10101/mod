@@ -219,7 +219,6 @@ int main(int argc, char *argv[])
 
   unsigned int memory_size = 1024 * 1024 * 1024;
   unsigned int cores_count = 25;
-  unsigned int queue_size = 300;
 
   //const libconfig::Setting &root = cfg.getRoot();
   try {
@@ -228,6 +227,23 @@ int main(int argc, char *argv[])
   }
   catch(const libconfig::SettingNotFoundException &nfex) {
     std::cerr << "No 'nmemory' setting in configuration file" << std::endl;
+  }
+
+  try {
+    cores_count = cfg.lookup("ncores");
+    std::cout << cores_count << std::endl;
+  }
+  catch(const libconfig::SettingNotFoundException &nfex) {
+    std::cerr << "No 'ncores' setting in configuration file" << std::endl;
+  }
+
+  try {
+    opt_count = cfg.lookup("ntasks");
+    std::cout << opt_count << std::endl;
+
+  }
+  catch(const libconfig::SettingNotFoundException &nfex) {
+    std::cerr << "No 'ntasks' setting in configuration file" << std::endl;
   }
 
   CS cs(memory_size, cores_count);

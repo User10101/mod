@@ -35,16 +35,6 @@ void Queue::pop_fifo(Time system_time)
   }
 }
 
-Op_result Queue::deque_sl()
-{
-  // TODO
-}
-
-Op_result Queue::dequeq_sf()
-{
-  // TODO
-}
-
 std::vector<Time> Queue::get_stat()
 {
   return stat;
@@ -53,6 +43,29 @@ std::vector<Time> Queue::get_stat()
 size_t Queue::size()
 {
   return queue.size();
+}
+
+Sl_queue::Sl_queue()
+{
+  // DO NOTHING
+}
+
+Sl_queue::~Sl_queue()
+{
+  // DO NOTHING
+}
+
+void Sl_queue::enque_task(Event *e)
+{
+  for (std::list<Event *>::iterator iter = queue.begin(); iter != queue.end();
+       ++iter) {
+    if (e->n_cores < (*iter)->n_cores) {
+      queue.insert(iter, e);
+      return;
+    }
+  }
+
+  queue.push_back(e);
 }
 
 CS::CS(unsigned int memory, unsigned int cores)
