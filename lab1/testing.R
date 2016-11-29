@@ -1,0 +1,21 @@
+queue.sl <- unlist(read.csv("queue1.dat"))
+queue.sf <- unlist(read.csv("queue2.dat"))
+queue.fifo <- unlist(read.csv("queue3.dat"))
+queue.sl.opt <- unlist(read.csv("queue4.dat"))
+queue.sf.opt <- unlist(read.csv("queue5.dat"))
+data <- ts(data.frame(queue.sl, queue.sf, queue.fifo, queue.sl.opt, queue.sf.opt))
+plot(data, type = "l")
+
+mean.sl <- mean(queue.sl)
+mean.sf <- mean(queue.sf)
+mean.fifo <- mean(queue.fifo)
+mean.sl.opt <- mean(queue.sl.opt)
+mean.sf.opt <- mean(queue.sf.opt)
+
+Box.test(queue.sl, type = "Ljung-Box")
+Box.test(queue.sf, type = "Ljung-Box")
+Box.test(queue.fifo, type = "Ljung-Box")
+Box.test(queue.sl.opt, type = "Ljung-Box")
+Box.test(queue.sf.opt, type = "Ljung-Box")
+
+wilcox.test(queue.sf.opt, queue.sl.opt)

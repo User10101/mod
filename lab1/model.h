@@ -19,6 +19,9 @@ enum Op_result { ERROR = -1, SUCCESS = 0 };
 
 class Event;
 
+/**
+ * Очередь FIFO.
+ */
 class Queue
 {
 public:
@@ -26,8 +29,8 @@ public:
   virtual ~Queue();
 
   virtual void enque_task(Event *e);
-  Event* top_fifo();
-  void pop_fifo(Time system_time);
+  virtual Event* try_pop(unsigned int free_cores, unsigned int free_memory,
+		 Time system_time);
 
   size_t size();
 
@@ -37,6 +40,9 @@ protected:
   std::vector<Time> stat;
 };
 
+/**
+ * Очередь, из которой самый тяжёлый элемент извлекается последним.
+ */
 class Sl_queue : public Queue
 {
 public:
@@ -46,12 +52,59 @@ public:
   void enque_task(Event *e) override;
 };
 
+/**
+ * Очередь, из которой самый тяжёлый элемент извлекается первым.
+ */
+class Sf_queue : public Queue
+{
+public:
+  Sf_queue();
+  virtual ~Sf_queue();
+
+  void enque_task(Event *e) override;
+};
+
+/**
+ * Очередь, из которой первым извлекается самый лёгкий подходящий элемент.
+ */
+class Sl_queue_opt : public Sl_queue
+{
+public:
+  Sl_queue_opt();
+  virtual ~Sl_queue_opt();
+
+  Event* try_pop(unsigned int free_cores, unsigned int free_memory,
+		 Time system_time) override;
+};
+
+
+/**
+ * Очередь, из которой первым извлекается самый тяжёлый подходящий элемент.
+ */
+class Sf_queue_opt : public Sl_queue
+{
+public:
+  Sf_queue_opt();
+  virtual ~Sf_queue_opt();
+
+  Event* try_pop(unsigned int free_cores, unsigned int free_memory,
+		 Time system_time) override;
+};
+
+/**
+ * Класс реализует модель вычислительной системы. Предоставляет методы для
+ * выделения.освобождения ядер и памяти.
+ */
 class CS
 {
 public:
   CS(unsigned int memory_size, unsigned int cores);
   ~CS();
 
+  /**
+   * Класс для запоминания текущего состояния ВС. Используется для накопления
+   * статистики.
+   */
   class State
   {
   public:
@@ -83,6 +136,9 @@ private:
   const unsigned int core_num;
 };
 
+/**
+ * Абстрактный класс, представляющий собой произвольное событие.
+ */
 class Event
 {
 public:
@@ -104,6 +160,9 @@ protected:
   Time _time;
 };
 
+/**
+ * Событие - приход новой задачи в ВС.
+ */
 class Task : public Event
 {
 public:
@@ -114,6 +173,9 @@ public:
 	       CS *cs, Time *system_time) override;
 };
 
+/**
+ * Событие - завершение выполнения задачи в ВС.
+ */
 class Cancel_task : public Event
 {
 public:

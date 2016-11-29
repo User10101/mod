@@ -2,12 +2,12 @@
 
 Queue::Queue()
 {
-  // TODO
+  // DO NOTHING
 }
 
 Queue::~Queue()
 {
-  // TODO
+  // DO NOTHING
 }
 
 void Queue::enque_task(Event *e)
@@ -18,21 +18,19 @@ void Queue::enque_task(Event *e)
   queue.push_back(e);
 }
 
-Event* Queue::top_fifo()
-{
-  if (queue.size() == 0) {
-    return nullptr;
-  }
-
-  return queue.front();
-}
-
-void Queue::pop_fifo(Time system_time)
+Event* Queue::try_pop(unsigned int free_cores, unsigned int free_memory,
+		       Time system_time)
 {
   if (queue.size() != 0) {
-    stat.push_back(system_time - (queue.front())->time());
-    queue.pop_front();
+    Event *e = queue.front();
+    if (e->n_cores <= free_cores && e->memory <= free_memory) {
+      stat.push_back(system_time - (queue.front())->time());
+      queue.pop_front();
+      return e;
+    }
   }
+
+  return nullptr;
 }
 
 std::vector<Time> Queue::get_stat()
@@ -59,13 +57,86 @@ void Sl_queue::enque_task(Event *e)
 {
   for (std::list<Event *>::iterator iter = queue.begin(); iter != queue.end();
        ++iter) {
-    if (e->n_cores < (*iter)->n_cores) {
+    if (e->execution_time < (*iter)->execution_time) {
       queue.insert(iter, e);
       return;
     }
   }
 
   queue.push_back(e);
+}
+
+Sf_queue::Sf_queue()
+{
+  // DO NOTHING
+}
+
+Sf_queue::~Sf_queue()
+{
+  // DO NOTHING
+}
+
+void Sf_queue::enque_task(Event *e)
+{
+  for (std::list<Event *>::iterator iter = queue.begin(); iter != queue.end();
+       ++iter) {
+    if (e->execution_time > (*iter)->execution_time) {
+      queue.insert(iter, e);
+      return;
+    }
+  }
+
+  queue.push_back(e);
+}
+
+Sl_queue_opt::Sl_queue_opt()
+{
+  // DO NOTHING
+}
+
+Sl_queue_opt::~Sl_queue_opt()
+{
+  // DO NOTHING
+}
+
+Event* Sl_queue_opt::try_pop(unsigned int free_cores, unsigned int free_memory,
+		 Time system_time)
+{
+  for (auto iter : queue) {
+    if (iter->memory <= free_memory && iter->n_cores <= free_cores) {
+      Event *e = iter;
+      queue.remove(e);
+      stat.push_back(system_time - e->time());
+      return e;
+    }
+  }
+
+  return nullptr;
+}
+
+Sf_queue_opt::Sf_queue_opt()
+{
+  // DO NOTHING
+}
+
+Sf_queue_opt::~Sf_queue_opt()
+{
+  // DO NOTHING
+}
+
+Event* Sf_queue_opt::try_pop(unsigned int free_cores, unsigned int free_memory,
+		 Time system_time)
+{
+  for (auto iter : queue) {
+    if (iter->memory <= free_memory && iter->n_cores <= free_cores) {
+      Event *e = iter;
+      queue.remove(e);
+      stat.push_back(system_time - e->time());
+      return e;
+    }
+  }
+
+  return nullptr;
 }
 
 CS::CS(unsigned int memory, unsigned int cores)
@@ -193,8 +264,11 @@ Task::~Task()
 void Task::execute(std::list<Event *> *calendar, Queue *queue,
 	       CS *cs, Time *system_time)
 {
+#ifdef DEBUG_LOG
   std::cout << "Executing Task with " << memory << " memory and " << n_cores <<
     " cores\n";
+#endif
+
   queue->enque_task(this);
   dequeue_and_execute(calendar, queue, cs, system_time);
 }
@@ -213,8 +287,11 @@ Cancel_task::~Cancel_task()
 void Cancel_task::execute(std::list<Event *> *calendar, Queue *queue,
 			  CS *cs, Time *system_time)
 {
+#ifdef DEBUG_LOG
   std::cout << "Executing Cancel_task with " << memory << " memory and "
 	    << n_cores << " cores\n";
+#endif
+
   cs->cores_free(n_cores, *system_time);
   cs->mem_free(memory, *system_time);
   dequeue_and_execute(calendar, queue, cs, system_time);
@@ -264,10 +341,9 @@ void dequeue_and_execute(std::list<Event *> *calendar, Queue *queue,
 			 CS *cs, Time *system_time)
 {
   while (queue->size() != 0) {
-    Event *e = queue->top_fifo();
-    if (e->memory <= cs->memory_available() &&
-	e->n_cores <= cs->cores_available()) {
-      queue->pop_fifo(*system_time);
+    Event *e = queue->try_pop(cs->cores_available(), cs->memory_available(),
+			      *system_time);
+    if (e != nullptr) {
       e->time(*system_time);
       cs->mem_alloc(e->memory, *system_time);
       cs->cores_alloc(e->n_cores, *system_time);
