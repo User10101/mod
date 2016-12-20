@@ -1,0 +1,7 @@
+digraph {
+	graph[rankdir=LR]
+	1 -> 1[label="t1"]
+	1 -> 2[label="(I)"]
+	2 -> 3[label="(II)"]
+	3 -> 2[label = "t2"]
+}

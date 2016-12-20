@@ -1,6 +1,8 @@
 #ifndef _MODEL_INCLUDED_
 #define _MODEL_INCLUDED_
 
+//#define DEBUG_LOG
+
 #include <fstream>
 #include <iostream>
 #include <cstdlib>
@@ -184,6 +186,20 @@ public:
 
   void execute(std::list<Event *> *calendar, Queue *queue,
 	       CS *cs, Time *system_time) override;
+};
+
+/**
+ * Событие - постановка задачи на выполнение.
+ */
+class Execute_task : public Event
+{
+public:
+  Execute_task(Time stime, Time etime, unsigned int ncores, unsigned int mem);
+  ~Execute_task();
+
+  void execute(std::list<Event *> *calendar, Queue *queue,
+	       CS *cs, Time *system_time) override;
+
 };
 
 Op_result schedule(Event *e, std::list<Event *> *calendar, Queue *queue,

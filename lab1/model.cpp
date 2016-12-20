@@ -21,16 +21,16 @@ void Queue::enque_task(Event *e)
 Event* Queue::try_pop(unsigned int free_cores, unsigned int free_memory,
 		       Time system_time)
 {
-  if (queue.size() != 0) {
-    Event *e = queue.front();
-    if (e->n_cores <= free_cores && e->memory <= free_memory) {
-      stat.push_back(system_time - (queue.front())->time());
-      queue.pop_front();
-      return e;
-    }
+  auto iter = *(queue.begin());
+  if (iter->memory <= free_memory && iter->n_cores <= free_cores) {
+    Event *e = iter;
+    queue.remove(e);
+    stat.push_back(system_time - e->time());
+    return e;
   }
 
   return nullptr;
+
 }
 
 std::vector<Time> Queue::get_stat()
@@ -270,7 +270,25 @@ void Task::execute(std::list<Event *> *calendar, Queue *queue,
 #endif
 
   queue->enque_task(this);
-  dequeue_and_execute(calendar, queue, cs, system_time);
+  unsigned int new_busy_cores = 0;
+  unsigned int new_busy_memory = 0;
+  while (queue->size() != 0) {
+    Event *e = queue->try_pop(cs->cores_available() - new_busy_cores, cs->memory_available() - new_busy_memory,
+			      *system_time);
+    if (e != nullptr) {
+      if (schedule(new Execute_task(*system_time, e->execution_time,
+				e->n_cores, e->memory), calendar, queue,
+		   cs, system_time) == ERROR) {
+	std::cerr << "Cannot schedule event\n";
+	exit(-1);
+      }
+      new_busy_cores += e->n_cores;
+      new_busy_memory += e->memory;
+      delete e;
+    } else {
+      break;
+    }
+  }
 }
 
 Cancel_task::Cancel_task(Time stime, unsigned int ncores, unsigned int mem)
@@ -294,7 +312,53 @@ void Cancel_task::execute(std::list<Event *> *calendar, Queue *queue,
 
   cs->cores_free(n_cores, *system_time);
   cs->mem_free(memory, *system_time);
-  dequeue_and_execute(calendar, queue, cs, system_time);
+  unsigned int new_busy_cores = 0;
+  unsigned int new_busy_memory = 0;
+  while (queue->size() != 0) {
+    Event *e = queue->try_pop(cs->cores_available() - new_busy_cores, cs->memory_available() - new_busy_memory,
+			      *system_time);
+    if (e != nullptr) {
+      if(schedule(new Execute_task(*system_time, e->execution_time,
+				e->n_cores, e->memory), calendar, queue,
+		  cs, system_time) == ERROR) {
+	std::cerr << "Cannot schedule event\n";
+	exit(-1);
+      }
+      delete e;
+      new_busy_cores += e->n_cores;
+      new_busy_memory += e->memory;
+    } else {
+      break;
+    }
+  }
+}
+
+Execute_task::Execute_task(Time stime, Time etime, unsigned int ncores, unsigned int mem)
+  : Event(stime, etime, ncores, mem, "Execute task")
+{
+  // DO NOTHING
+}
+
+Execute_task::~Execute_task()
+{
+  // DO NOTHING
+}
+
+void Execute_task::execute(std::list<Event *> *calendar, Queue *queue,
+	       CS *cs, Time *system_time)
+{
+#ifdef DEBUG_LOG
+  std::cout << "Executing Execute task with " << memory << " memory and " << n_cores <<
+    " cores\n";
+#endif
+  cs->mem_alloc(memory, *system_time);
+  cs->cores_alloc(n_cores, *system_time);
+  Event *ct = new Cancel_task(*system_time + execution_time,
+			      n_cores, memory);
+  if (schedule(ct, calendar, queue, cs, system_time) == ERROR) {
+    std::cerr << "Cannot schedule event\n";
+    exit(-1);
+  }
 }
 
 Op_result schedule(Event *e, std::list<Event *> *calendar, Queue *queue,
@@ -334,26 +398,6 @@ void simulate(std::list<Event *> *calendar, Queue *queue,
     calendar->remove(*iter);
     *system_time = e->time();
     e->execute(calendar, queue, cs, system_time);
-  }
-}
-
-void dequeue_and_execute(std::list<Event *> *calendar, Queue *queue,
-			 CS *cs, Time *system_time)
-{
-  while (queue->size() != 0) {
-    Event *e = queue->try_pop(cs->cores_available(), cs->memory_available(),
-			      *system_time);
-    if (e != nullptr) {
-      e->time(*system_time);
-      cs->mem_alloc(e->memory, *system_time);
-      cs->cores_alloc(e->n_cores, *system_time);
-      Event *ct = new Cancel_task(*system_time + e->execution_time,
-				  e->n_cores, e->memory);
-      delete e;
-      schedule(ct, calendar, queue, cs, system_time);
-    } else {
-      break;
-    }
   }
 }
 
